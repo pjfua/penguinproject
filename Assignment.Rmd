@@ -1,0 +1,297 @@
+---
+title: "Reproducible Science Assignment"
+output:
+  html_document: default
+  pdf_document: default
+date: "2023-11-25"
+---
+------------------------------------------------------------------------
+
+
+#### QUESTION 01: Data Visualisation for Science Communication
+
+*Create a figure using the Palmer Penguin dataset that is correct but badly communicates the data. **Do not make a boxplot**.*
+
+*Note: Focus on visual elements rather than writing misleading text on it.*
+
+#### a) Provide your figure here:
+
+
+
+
+```{r, echo = FALSE, message = FALSE, results = FALSE}
+install.packages(c("ggplot2", "palmerpenguins", "dplyr", "janitor"))
+library(ggplot2)
+library(palmerpenguins)
+library(dplyr)
+library(janitor)
+
+source("functions/cleaning.r")
+source("functions/plotting.r")
+
+penguins_clean <- penguins_raw %>%
+    clean_column_names() %>%
+    shorten_species() %>%
+    remove_empty_columns_rows()
+
+head(penguins_clean)
+
+penguins_new <- penguins_clean %>%
+  subset_columns(c("species", "island", "body_mass_g")) %>%
+  remove_NA() %>%
+  group_by(species, island) %>%
+  summarise(mean_mass = mean(body_mass_g))
+
+head(penguins_new)
+
+ggplot(penguins_new, aes(x = species, y = mean_mass, fill = island)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Mean Body Mass of Penguins by Species and Island",
+       x = "Species",
+       y = "Mean Body Mass (g)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  coord_cartesian(ylim = c(3500, 5500))
+
+
+```
+
+##### b) Write about how your design choices mislead the reader about the underlying data (200-300 words).
+
+*Include references.*
+
+
+
+------------------------------------------------------------------------
+
+
+#### QUESTION 2: Data Pipeline
+
+*Write a data analysis pipeline in your .rmd RMarkdown file. You should be aiming to write a clear explanation of the steps as well as clear code.*
+
+*Your code should include the steps practiced in the lab session:*
+
+-   *Load the data*
+
+-   *Appropriately clean the data*
+
+-   *Create an Exploratory Figure (**not a boxplot**)*
+
+-   *Save the figure*
+
+-   ***New**: Run a statistical test*
+
+-   ***New**: Create a Results Figure*
+
+-   *Save the figure*
+
+
+```{r, echo = FALSE}
+options(repos = c(CRAN = "https://cran.r-project.org"))
+```
+
+### Data Loading and Cleaning
+
+```{r, message= FALSE, results= FALSE}
+#First, we install and load all the necessary packages to conduct our data analysis. Loading packages enables us to easily use data stored in external packages, in the case of palmerpenguins, or to use functions already written by someone else.
+
+install.packages(c("ggplot2", "palmerpenguins", "janitor", "dplyr", "svglite"))
+
+#Load the packages:
+library(ggplot2)
+library(palmerpenguins)
+library(janitor)
+library(dplyr)
+library(svglite)
+
+#We also need to include any functions we have written ourselves, that are saved to a separate R file for easier code organisation:
+
+source("functions/cleaning.r")
+source("functions/plotting.r")
+
+
+```
+
+```{r}
+#Now, we can save the raw data. It is important to save a copy of the data, instead of editing the raw data itself, since we want to keep a clean original copy in case we need to come back to the original data. So, we make a copy of the raw data and save it in a directory allocated just for data. This enables easier organisation of code, by keeping data files separate.
+write.csv(penguins_raw, "data/penguins_raw.csv")
+
+#Check the raw data. Now we can look at the column names using the names() function. 
+names(penguins_raw)
+head(penguins_raw)
+
+#  We see that the names are not all computer friendly, and that some are unnecessarily long (the species names of the penguins). We can use functions defined in our own cleaning.r script to fix this. We use pipes because we are using multiple functions here, on the same dataset, in order to create a new, cleaned data set.
+penguins_clean <- penguins_raw %>%
+    clean_column_names() %>%
+    shorten_species() %>%
+    remove_empty_columns_rows()
+
+# We check the cleaned data to see whether we have eliminated empty columns and whether the column names are as we want them.
+names(penguins_clean)
+
+# Save cleaned data. Again, we make a new copy of the data (in case we want to come back to the raw data at any point to access information lost in the cleaning) and save it in the designated data folder:
+
+write.csv(penguins_clean, "data/penguins_clean.csv")
+
+head(penguins_clean)
+#Much better!
+```
+
+## Data Analysis
+### Introduction
+
+##### Now that I have cleaned and saved my data, I can think about the question I want to address with this dataset. This dataset describes populations of three species of penguin living on different islands. A range of measurements have been taken for each penguin describing their phenotypes and life-history traits. These include culmen depth and culmen length, which broadly can be combined to describe beak morphology. From just this dataset alone, I know little about the different ecologies of each species. I do know, however, that beak size and shape is often a good indicator of diet in birds. I would, therefore, like to investigate the relationship between culmen depth and length in my data analysis. 
+
+##### I will consider all species of penguins simultaneously. This is because there seems to be overlap with the islands they are found on and, without further life-history data, I do not want to assume species differences in feeding strategy that could be inferred from beak morphology. 
+
+### Hypotheses
+
+##### My null hypothesis is that culmen depth cannot be predicted from culmen length in the population of all three penguin species.
+
+##### My alternative hypothesis is that culmen depth can be predicted from culmen length in the population of all three penguin species.
+
+### Statistical Methods
+
+
+```{r}
+#I will start by creating an exploratory graph to better visualise the data and understand what I am working with. First, I need to subset my data so I am only looking at the columns of interest to me.
+
+culmen_data <- penguins_clean %>%
+  subset_columns(c("culmen_length_mm", "culmen_depth_mm", "species")) %>%
+  remove_NA()
+
+head(culmen_data)
+write.csv(culmen_data, "data/culmen_data.csv")
+
+ ggplot(data=culmen_data, aes(x = culmen_length_mm, 
+                                y = culmen_depth_mm))+
+  geom_point()
+
+```
+
+```{r}
+#From my graph, I think that there may be a weak negative correlation between my two numerical variables. There also seems to be some grouping which I suspect could be due to species differences. I will visualise this in my final exploratory plot.
+
+explor <-  ggplot(data=culmen_data, aes(x = culmen_length_mm, 
+                                y = culmen_depth_mm))+
+  geom_point(aes(color=species))
+
+explor
+```
+
+```{r, message=FALSE, results=FALSE}
+#Just as I suspected! The three species tend to group together in this 'trait space'. To save my figure, I will use svglite, which enables me to save figures as vector files, meaning they can be easily scaled without losing resolution.
+
+svglite("figures/explor.svg",
+        width = 5.9, height = 5.9)
+explor
+dev.off()
+```
+
+
+##### Exploratory plot is now saved in the 'figures' folder. The following code describes my data analysis.
+
+##### Since I am comparing two numerical variables, I will be conducting a linear regression:
+
+```{r}
+#I create a linear model called linear_model using the lm() function:
+
+linear_model <- lm(culmen_depth_mm ~ culmen_length_mm, culmen_data)
+
+#I look at a summary table of my model and look at the coefficients:
+
+summary(linear_model)
+```
+##### The value after Intercept() is the Y intercept of my regression, and the value below that is the slope of the line. The slope shows that there was, indeed, a slight negative correlation.
+##### However, the R squared value is very low: it doesn't seem like the biological significance of culmen length:depth is very high for this analysis.
+
+##### I will also test whether the assumptions for a linear regression hold up for my analysis.
+
+```{r}
+plot(linear_model, which = 2)
+plot(linear_model, which = 1)
+```
+
+#####  The first diagnostic plot, the Q-Q plot, shows me that my data, for the most part, follow a normal distribution and so I am happy with my choice of regression for the analysis.
+
+##### The second diagnostic plot, the residuals vs fitted plot, doesn't seem to have a clear pattern, and the points seem to be fairly randomly distributed around zero. Again, I am happy that my data analysis fits the assumptions of linear regression.
+
+### Statistical Significance and Results
+
+##### I will use the anova() function to obtain a p value for my model:
+
+```{r}
+anova(linear_model)
+```
+##### The p-value I obtain is less than 0.05, so my result is statistically significant. 
+
+##### I can reject my null hypothesis. I have evidence that culmen length can be used to predict culmen depth.
+
+
+### Results Figure 
+
+```{r, message=FALSE, results=FALSE}
+#(I have saved my plotting functions in my separate functions folder, to better organise my code. This also prevents me from writing out the same function every time I want to make this plot).
+
+results_figure <- plot_culmen(culmen_data)
+results_figure
+```
+
+
+```{r, message=FALSE, results=FALSE}
+#Now, save the results figure in a way which makes it easy to edit if I need to change size/proportions for a powerpoint/article etc.
+
+save_culmen_plot_svg(culmen_data, "figures/resultsfig_vector.svg",
+                     size = 15, scaling = 1)
+
+```
+
+
+### Discussion
+
+```{r, echo = FALSE, message = FALSE}
+results_figure
+```
+
+##### There is enough evidence to reject the null hypothesis and suggest that culmen length can be used to predict culmen depth with statistical significance. However, the R squared value of this analysis was very low, indicating that a low proportion of the variance can be explained by my explanatory variable. Furthermore, it is clear that there is a species-based clustering in trait values and that, within each species, the relationship between culmen length and depth appears to be positive, the opposite of what was seen when all three species were analysed simultaneously.
+
+##### Functional trait ecology often analyses trait values in this way, by considering measured phenotypic traits across different species simultaneously and looking for trait-related patterns. As well as this, I did not want to assume species difference from the start of my analysis, especially since the species overlap slightly in the islands they inhabit, meaning that they may occupy similar niches and be expected to have similar trait values. Therefore, despite the low explanatory (though statistically significant) power of culmen length on culmen depth, I think my initial decision to consider all three species simultaneously was justified.
+
+##### Despite this, I do think that further analyses should focus on within-species variation and attempt to link this to other ecological traits which were not available in the dataset, such as typical prey size or type. Furthermore, it is possible that culmen length and depth are not the best metrics of beak type in these penguins. Beak density, sharpness, and other aspects of morphology could be more relevant to hunting adaptations.
+
+##### In conclusion, this analysis reveals a very weak negative correlation between culmen length and depth across these three penguin species, but it remains unclear whether there is a biologically significant reason for this. There remains much variation which could likely be partially explained by species differences and should be the focus of further analyses. Attempts to link phenotypes, such as bill size, to their ecological significance would need to incorporate specific data concerning feeding habits and diet composition.
+
+
+------------------------------------------------------------------------
+
+## QUESTION 3: Open Science
+
+### a) GitHub
+
+*Upload your RProject you created for **Question 2** and any files and subfolders used to GitHub. Do not include any identifiers such as your name. Make sure your GitHub repo is public.*
+
+*GitHub link:*
+
+*You will be marked on your repo organisation and readability.*
+
+### b) Share your repo with a partner, download, and try to run their data pipeline.
+
+*Partner's GitHub link:*
+
+*You **must** provide this so I can verify there is no plagiarism between you and your partner.*
+
+### c) Reflect on your experience running their code. (300-500 words)
+
+-   *What elements of your partner's code helped you to understand their data pipeline?*
+
+-   *Did it run? Did you need to fix anything?*
+
+-   *What suggestions would you make for improving their code to make it more understandable or reproducible, and why?*
+
+-   *If you needed to alter your partner's figure using their code, do you think that would be easy or difficult, and why?*
+
+### d) Reflect on your own code based on your experience with your partner's code and their review of yours. (300-500 words)
+
+-   *What improvements did they suggest, and do you agree?*
+
+-   *What did you learn about writing code for other people?*
